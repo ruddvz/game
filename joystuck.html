@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Battle 2026</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; background: #222; color: #0f0; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; text-align: center; }
+        canvas { display: block; margin: 0 auto; background: #111; image-rendering: pixelated; border: 4px solid #444; }
+        .menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { font-size: 2rem; width: 150px; text-align: center; background: #222; color: #0f0; border: 2px solid #0f0; padding: 10px; margin: 10px; }
+        .btn { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background: #0f0; color: #000; border: none; font-weight: bold; }
+        #ui { position: fixed; top: 10px; width: 100%; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="menu" class="menu">
+        <h1 style="font-size: 1.5rem;">3-DIGIT ROOM</h1>
+        <input type="number" id="room-code" placeholder="123" maxlength="3">
+        <div>
+            <button class="btn" onclick="connect(true)">HOST</button>
+            <button class="btn" style="background:#00f2ff" onclick="connect(false)">JOIN</button>
+        </div>
+        <p id="status">Enter 3 numbers to start.</p>
+    </div>
+
+    <div id="ui" style="display:none">
+        <div id="info">CONNECTED</div>
+    </div>
+
+    <canvas id="game"></canvas>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 320; 
+        canvas.height = 480;
+
+        let peer, conn, isHost;
+        let myPos = { x: 50, y: 100, role: 'knight' };
+        let peerPos = { x: 200, y: 300, role: 'ghost' };
+
+        // Drawing Pixel Characters
+        function drawPixelChar(x, y, type, color) {
+            ctx.fillStyle = color;
+            if (type === 'knight') {
+                ctx.fillRect(x+4, y, 12, 12); // Head
+                ctx.fillRect(x, y+12, 20, 16); // Body
+                ctx.fillStyle = "#fff"; ctx.fillRect(x+6, y+4, 2, 2); ctx.fillRect(x+12, y+4, 2, 2); // Eyes
+            } else {
+                ctx.fillRect(x+2, y, 16, 20); // Ghost Body
+                ctx.fillRect(x, y+20, 4, 4); ctx.fillRect(x+8, y+20, 4, 4); ctx.fillRect(x+16, y+20, 4, 4); // Tail
+                ctx.fillStyle = "#000"; ctx.fillRect(x+5, y+6, 3, 3); ctx.fillRect(x+12, y+6, 3, 3); // Eyes
+            }
+        }
+
+        function connect(host) {
+            isHost = host;
+            const code = document.getElementById('room-code').value;
+            if(code.length < 1) return alert("Enter a code!");
+
+            document.getElementById('status').innerText = "Connecting...";
+            // We prefix the code to make it unique in the PeerJS network
+            const finalID = "LDR-GAME-" + code;
+            
+            if(isHost) {
+                peer = new Peer(finalID);
+                peer.on('open', () => { document.getElementById('status').innerText = "Waiting for Player 2..."; });
+                peer.on('connection', (c) => { conn = c; setup(); });
+                myPos.role = 'knight'; peerPos.role = 'ghost';
+            } else {
+                peer = new Peer();
+                peer.on('open', () => {
+                    conn = peer.connect(finalID);
+                    setup();
+                });
+            }
+        }
+
+        function setup() {
+            conn.on('open', () => {
+                document.getElementById('menu').style.display = 'none';
+                document.getElementById('ui').style.display = 'block';
+                if(!isHost) { myPos.role = 'ghost'; peerPos.role = 'knight'; }
+                gameLoop();
+            });
+            conn.on('data', (data) => { peerPos = data; });
+        }
+
+        // Touch Movement
+        window.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            myPos.x = (touch.clientX - rect.left) * scaleX - 10;
+            myPos.y = (touch.clientY - rect.top) * scaleY - 10;
+
+            if(conn && conn.open) conn.send(myPos);
+        });
+
+        function gameLoop() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Players
+            drawPixelChar(myPos.x, myPos.y, myPos.role, isHost ? '#0f0' : '#f0f');
+            drawPixelChar(peerPos.x, peerPos.y, peerPos.role, isHost ? '#f0f' : '#0f0');
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Scaling for mobile
+        function resize() {
+            const scale = Math.min(window.innerWidth / canvas.width, window.innerHeight / canvas.height);
+            canvas.style.width = (canvas.width * scale) + "px";
+            canvas.style.height = (canvas.height * scale) + "px";
+        }
+        window.addEventListener('resize', resize);
+        resize();
+    </script>
+</body>
+</html>
