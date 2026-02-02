@@ -3,34 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PIXEL KILL: EXTREME</title>
+    <title>PIXEL KILL: HD PRO</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #050508; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
         canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-        .menu { position: fixed; inset: 0; background: radial-gradient(circle, #300 0%, #000 100%); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ff0044; }
-        h1 { font-size: 3rem; margin: 0; text-shadow: 0 0 15px #f00; letter-spacing: 5px; }
-        input { font-size: 2rem; width: 160px; text-align: center; background: #000; color: #fff; border: 3px solid #ff0044; padding: 10px; margin: 15px; outline: none; }
-        .btn { padding: 15px 40px; font-size: 1.1rem; cursor: pointer; background: #ff0044; color: #fff; border: none; font-weight: bold; margin: 5px; }
-        #stats { position: fixed; top: 10px; width: 100%; display: none; justify-content: space-between; padding: 0 20px; color: #fff; z-index: 10; font-size: 1.2rem; }
+        
+        /* Menu Overlay */
+        .menu { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ff0044; }
+        .hud { position: fixed; top: 0; width: 100%; padding: 20px; display: none; justify-content: space-between; z-index: 10; pointer-events: none; }
+        .hp-cont { width: 150px; height: 15px; background: #222; border: 2px solid #ff0044; border-radius: 10px; overflow: hidden; }
+        .hp-fill { height: 100%; background: #ff0044; transition: width 0.2s; box-shadow: 0 0 10px #ff0044; }
+        
+        /* Controls */
+        .controls { position: fixed; bottom: 40px; right: 40px; display: none; z-index: 10; }
+        .dash-btn { width: 80px; height: 80px; background: rgba(255,0,68,0.2); border: 3px solid #ff0044; border-radius: 50%; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        
+        input { font-size: 1.5rem; width: 220px; text-align: center; background: #111; color: #fff; border: 2px solid #ff0044; padding: 10px; margin: 20px; border-radius: 5px; }
+        .start-btn { padding: 15px 35px; font-size: 1rem; cursor: pointer; background: #ff0044; color: #fff; border: none; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div id="menu" class="menu">
-        <h1>PIXEL KILL</h1>
-        <p style="color: #fff;">SYNC 3-DIGIT CODE</p>
-        <input type="number" id="room-code" placeholder="000">
-        <div>
-            <button class="btn" onclick="initGame(true)">HOST (SURVIVOR)</button>
-            <button class="btn" style="background:#0cf" onclick="initGame(false)">JOIN (KILLER)</button>
+        <h1 style="color:#fff; font-size: 3rem;">PIXEL<span style="color:#ff0044;">KILL</span></h1>
+        <input type="number" id="room-code" placeholder="ROOM CODE">
+        <div style="display:flex; gap:10px;">
+            <button class="start-btn" onclick="initGame(true)">HOST</button>
+            <button class="start-btn" style="background:#00f2ff" onclick="initGame(false)">JOIN</button>
         </div>
     </div>
 
-    <div id="stats">
-        <div id="hp-display"></div>
-        <div id="role-text">HUNTING...</div>
+    <div class="hud" id="hud">
+        <div><div style="color:#fff; font-size: 0.8rem; margin-bottom:5px;">SURVIVOR STATUS</div><div class="hp-cont"><div id="hp-fill" class="hp-fill"></div></div></div>
+        <div id="status-msg" style="color:#ff0044; font-weight:bold; text-align:right;">SYNCING...</div>
+    </div>
+
+    <div class="controls" id="controls">
+        <div class="dash-btn" id="dash-trigger">DASH</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -38,30 +49,27 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let peer, conn, isHost;
-        let particles = [], bloodStains = [], screenShake = 0;
-        
-        const world = { w: 1000, h: 1600 }; 
-        const obstacles = [
-            {x: 200, y: 400, w: 600, h: 40}, {x: 480, y: 600, w: 40, h: 400}, 
-            {x: 100, y: 1100, w: 300, h: 40}, {x: 600, y: 1100, w: 300, h: 40}
-        ];
-        const lavaPits = [{x: 350, y: 800, w: 300, h: 150}, {x: 50, y: 50, w: 100, h: 100}];
-        let powerUp = {x: 500, y: 200, active: true};
+        let peer, conn, isHost, touchStart = null;
+        let shake = 0, blood = [], frame = 0;
 
-        let p1 = { x: 200, y: 200, hp: 3, color: '#0f6', vx: 0, vy: 0, invuln: 0, boost: 0 }; 
-        let p2 = { x: 800, y: 1400, color: '#f04', vx: 0, vy: 0, boost: 0 }; 
-        
-        let touchStart = null;
+        const world = { w: 1000, h: 1600 };
+        const safeZone = { x: 350, y: 50, w: 300, h: 200 };
+        const obstacles = [
+            {x: 100, y: 400, w: 250, h: 40}, {x: 650, y: 400, w: 250, h: 40},
+            {x: 480, y: 700, w: 40, h: 400}, {x: 0, y: 1200, w: 400, h: 40}, {x: 600, y: 1200, w: 400, h: 40}
+        ];
+
+        let p1 = { x: 500, y: 150, hp: 100, color: '#00f2ff', vx:0, vy:0, rot:0, bob:0, dash:0 };
+        let p2 = { x: 500, y: 1400, color: '#ff0044', vx:0, vy:0, rot:0, bob:0, dash:0 };
 
         function initGame(host) {
             isHost = host;
             const code = document.getElementById('room-code').value;
-            if(!code) return alert("Code!");
-            peer = new Peer(host ? "PK-MOD-" + code : null);
+            if(!code) return alert("Enter Code");
+            peer = new Peer("PK-ULTRA-" + code);
             peer.on('open', () => {
-                if(host) document.getElementById('menu').innerHTML = "<h1>WAITING...</h1><p>CODE: "+code+"</p>";
-                else { conn = peer.connect("PK-MOD-" + code); setup(); }
+                if(host) document.getElementById('menu').innerHTML = "<h1>ROOM: "+code+"</h1><p>WAITING FOR KILLER...</p>";
+                else { conn = peer.connect("PK-ULTRA-" + code); setup(); }
             });
             peer.on('connection', (c) => { conn = c; setup(); });
         }
@@ -69,79 +77,89 @@
         function setup() {
             conn.on('open', () => {
                 document.getElementById('menu').style.display = 'none';
-                document.getElementById('stats').style.display = 'flex';
-                document.getElementById('role-text').innerText = isHost ? "SURVIVOR" : "KILLER";
-                setInterval(() => { if(isHost) { powerUp.x = Math.random()*800; powerUp.y = Math.random()*1400; powerUp.active = true; }}, 10000);
+                document.getElementById('hud').style.display = 'flex';
+                document.getElementById('controls').style.display = 'block';
+                document.getElementById('dash-trigger').ontouchstart = () => { (isHost ? p1 : p2).dash = 15; };
                 loop();
             });
-            conn.on('data', d => { if(isHost) p2 = d; else { p1 = d.p1; particles = d.parts; bloodStains = d.blood; screenShake = d.shake; powerUp = d.pw; }});
+            conn.on('data', d => { if(isHost) p2 = d; else { p1 = d.p1; blood = d.blood; shake = d.shake; }});
         }
 
-        window.addEventListener('touchstart', e => { touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
+        window.addEventListener('touchstart', e => { if(e.target.id !== 'dash-trigger') touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
         window.addEventListener('touchmove', e => {
             if(!touchStart) return;
             const dx = e.touches[0].clientX - touchStart.x, dy = e.touches[0].clientY - touchStart.y;
             const angle = Math.atan2(dy, dx), me = isHost ? p1 : p2;
-            const speed = (me.boost > 0 ? 12 : 7);
+            const speed = (me.dash > 0 ? 18 : 8);
             me.vx = Math.cos(angle) * speed; me.vy = Math.sin(angle) * speed;
+            me.rot = angle + Math.PI/2; me.bob += 0.2;
         });
         window.addEventListener('touchend', () => { const me = isHost ? p1 : p2; me.vx = 0; me.vy = 0; touchStart = null; });
 
-        function loop() {
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-            const me = isHost ? p1 : p2;
-            const canMove = (nx, ny) => !obstacles.some(o => nx < o.x + o.w && nx + 40 > o.x && ny < o.y + o.h && ny + 40 > o.y);
-            if(canMove(me.x + me.vx, me.y)) me.x += me.vx; if(canMove(me.x, me.y + me.vy)) me.y += me.vy;
-            me.x = Math.max(0, Math.min(world.w-40, me.x)); me.y = Math.max(0, Math.min(world.h-40, me.y));
-
-            if(isHost) {
-                if(p1.invuln > 0) p1.invuln--; if(p1.boost > 0) p1.boost--; if(p2.boost > 0) p2.boost--;
-                
-                // Lava Damage
-                lavaPits.forEach(l => { if(p1.x < l.x+l.w && p1.x+40 > l.x && p1.y < l.y+l.h && p1.y+40 > l.y) p1.hp -= 0.005; });
-                
-                // Powerup collision
-                if(powerUp.active) {
-                    [p1, p2].forEach(p => { if(Math.abs(p.x-powerUp.x)<40 && Math.abs(p.y-powerUp.y)<40) { p.boost = 300; powerUp.active = false; }});
-                }
-
-                // Combat
-                const dist = Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
-                if(dist < 55 && p1.invuln <= 0) {
-                    p1.hp--; p1.invuln = 60; screenShake = 15;
-                    for(let i=0; i<10; i++) particles.push({x: p1.x+20, y: p1.y+20, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 25});
-                    bloodStains.push({x: p1.x, y: p1.y, life: 200});
-                    const ang = Math.atan2(p1.y - p2.y, p1.x - p2.x);
-                    p1.x += Math.cos(ang)*120; p1.y += Math.sin(ang)*120; p2.x -= Math.cos(ang)*60; p2.y -= Math.sin(ang)*60;
-                }
-                document.getElementById('hp-display').innerHTML = "❤️".repeat(Math.ceil(p1.hp));
-                if(p1.hp <= 0) { alert("KILLER WINS"); location.reload(); }
-                if(conn) conn.send({p1, parts: particles, blood: bloodStains, shake: screenShake, pw: powerUp});
-            } else if(conn) conn.send(p2);
-
-            ctx.clearRect(0,0,canvas.width, canvas.height);
-            if(screenShake > 0) { ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake); screenShake *= 0.9; }
-            ctx.save(); ctx.scale(canvas.width/world.w, canvas.height/world.h);
+        function drawPlayer(p, isKiller) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            const b = Math.sin(p.bob) * 5;
             
-            // Lava & Blood
-            ctx.fillStyle = '#400'; lavaPits.forEach(l => ctx.fillRect(l.x, l.y, l.w, l.h));
-            bloodStains.forEach((b, i) => { ctx.fillStyle = `rgba(150,0,0,${b.life/200})`; ctx.fillRect(b.x, b.y, 40, 40); b.life--; if(b.life<=0) bloodStains.splice(i,1); });
+            // Neon Glow
+            ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-18, -18 + b, 36, 40); // Body
+            
+            // Helmet Visor
+            ctx.fillStyle = '#000'; ctx.fillRect(-15, -10+b, 30, 10);
+            ctx.fillStyle = '#fff'; ctx.fillRect(-12, -8+b, 5, 2); 
 
-            // Walls & Powerup
-            ctx.fillStyle = '#222'; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
-            if(powerUp.active) { ctx.fillStyle = '#ff0'; ctx.fillRect(powerUp.x, powerUp.y, 30, 30); }
-
-            particles.forEach((p, i) => { ctx.fillStyle='#f00'; ctx.fillRect(p.x, p.y, 6, 6); p.x+=p.vx; p.y+=p.vy; p.life--; if(p.life<=0) particles.splice(i,1); });
-            drawChar(p1.x, p1.y, p1.color, false, p1.invuln > 0, p1.boost > 0);
-            drawChar(p2.x, p2.y, p2.color, true, false, p2.boost > 0);
-            ctx.restore(); requestAnimationFrame(loop);
+            if(isKiller) {
+                ctx.fillStyle = '#fff'; ctx.fillRect(18, -15+b, 8, 35); // Blade
+                ctx.fillStyle = '#444'; ctx.fillRect(16, 20+b, 12, 5); // Guard
+            }
+            ctx.restore();
         }
 
-        function drawChar(x, y, color, isK, hit, bst) {
-            ctx.fillStyle = hit ? '#fff' : color; ctx.fillRect(x, y, 40, 40);
-            if(bst) { ctx.strokeStyle='#ff0'; ctx.lineWidth=4; ctx.strokeRect(x-5, y-5, 50, 50); }
-            ctx.fillStyle = '#fff'; ctx.fillRect(x+8, y+8, 8, 8); ctx.fillRect(x+24, y+8, 8, 8);
-            if(isK) { ctx.fillStyle='#ddd'; ctx.fillRect(x-20, y+15, 20, 8); ctx.fillStyle='#600'; ctx.fillRect(x-5, y+10, 6, 20); }
+        function loop() {
+            frame++;
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const me = isHost ? p1 : p2;
+            if(me.dash > 0) me.dash--;
+
+            // Collision Physics
+            const check = (nx, ny, char) => {
+                if(char === 'killer' && nx > safeZone.x && nx < safeZone.x+safeZone.w && ny > safeZone.y && ny < safeZone.y+safeZone.h) return false;
+                return !obstacles.some(o => nx < o.x + o.w && nx + 30 > o.x && ny < o.y + o.h && ny + 30 > o.y);
+            };
+
+            const role = isHost ? 'survivor' : 'killer';
+            if(check(me.x + me.vx, me.y, role)) me.x += me.vx;
+            if(check(me.x, me.y + me.vy, role)) me.y += me.vy;
+            me.x = Math.max(20, Math.min(world.w-20, me.x)); me.y = Math.max(20, Math.min(world.h-20, me.y));
+
+            if(isHost) {
+                const dist = Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
+                const inSafe = (p1.x > safeZone.x && p1.x < safeZone.x+safeZone.w && p1.y > safeZone.y && p1.y < safeZone.y+safeZone.h);
+                if(dist < 60 && !inSafe) {
+                    p1.hp -= 0.5; shake = 10;
+                    if(frame % 5 === 0) blood.push({x:p1.x, y:p1.y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, l:30});
+                }
+                document.getElementById('hp-fill').style.width = p1.hp + "%";
+                if(p1.hp <= 0) { alert("KILLER WINS"); location.reload(); }
+                if(conn) conn.send({p1, blood, shake});
+            } else if(conn) conn.send(p2);
+
+            if(shake > 0) { ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); shake *= 0.8; }
+            ctx.save(); ctx.scale(canvas.width/world.w, canvas.height/world.h);
+            
+            // Safe Zone Drawing
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.1)';
+            ctx.fillRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+            ctx.strokeStyle = '#00f2ff'; ctx.strokeRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+
+            ctx.fillStyle = '#1a1a2a'; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+            blood.forEach((b,i) => { ctx.fillStyle = `rgba(255,0,68,${b.l/30})`; ctx.fillRect(b.x, b.y, 5, 5); b.x+=b.vx; b.y+=b.vy; b.l--; if(b.l<=0) blood.splice(i,1); });
+
+            drawPlayer(p1, false); drawPlayer(p2, true);
+            ctx.restore(); requestAnimationFrame(loop);
         }
     </script>
 </body>
