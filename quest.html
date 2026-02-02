@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NEON STRIKE: 2-PLAYER BATTLE</title>
+    <style>
+        body { margin: 0; background: #050505; color: #00f2ff; font-family: 'Courier New', Courier, monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: #000; border: 2px solid #00f2ff; box-shadow: 0 0 20px #00f2ff; display: block; }
+        .ui { position: absolute; top: 10px; width: 780px; display: flex; justify-content: space-between; pointer-events: none; }
+        .stats { background: rgba(0, 0, 0, 0.7); padding: 10px; border: 1px solid #00f2ff; }
+        .controls { position: absolute; bottom: 10px; font-size: 12px; color: rgba(0, 242, 255, 0.5); }
+        #menu { position: absolute; background: rgba(0,0,0,0.9); padding: 50px; border: 3px solid #ff007f; text-align: center; z-index: 100; }
+        .btn { background: #ff007f; color: white; border: none; padding: 15px 30px; font-size: 20px; cursor: pointer; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <h1 style="color: #ff007f; font-size: 40px;">NEON STRIKE</h1>
+        <p>PLAYER 1: WASD + SPACE to Shoot</p>
+        <p>PLAYER 2: ARROWS + ENTER to Shoot</p>
+        <button class="btn" onclick="startGame()">START BATTLE</button>
+    </div>
+
+    <div class="ui">
+        <div class="stats" id="p1-stats">P1 HEALTH: 100</div>
+        <div class="stats" id="p2-stats">P2 HEALTH: 100</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="controls">WASD: P1 | ARROWS: P2 | ESC: RESTART</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800;
+        canvas.height = 600;
+
+        let gameRunning = false;
+        const keys = {};
+
+        // Player Objects
+        const p1 = { x: 100, y: 300, w: 30, h: 30, color: '#00f2ff', hp: 100, speed: 5, lasers: [] };
+        const p2 = { x: 670, y: 300, w: 30, h: 30, color: '#ff007f', hp: 100, speed: 5, lasers: [] };
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function startGame() {
+            document.getElementById('menu').style.display = 'none';
+            gameRunning = true;
+            loop();
+        }
+
+        function drawPlayer(p, angle) {
+            ctx.save();
+            ctx.translate(p.x + p.w/2, p.y + p.h/2);
+            ctx.rotate(angle);
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-p.w/2, -p.h/2, p.w, p.h);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = p.color;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function updatePlayer(p, up, down, left, right, shootKey, dir) {
+            if (keys[up] && p.y > 0) p.y -= p.speed;
+            if (keys[down] && p.y < canvas.height - p.h) p.y += p.speed;
+            if (keys[left] && p.x > 0) p.x -= p.speed;
+            if (keys[right] && p.x < canvas.width - p.w) p.x += p.speed;
+
+            if (keys[shootKey]) {
+                if (p.lasers.length < 5) {
+                    p.lasers.push({ x: p.x + p.w/2, y: p.y + p.h/2, vx: dir * 8 });
+                    keys[shootKey] = false; // Prevents spamming
+                }
+            }
+
+            p.lasers.forEach((l, i) => {
+                l.x += l.vx;
+                if (l.x < 0 || l.x > canvas.width) p.lasers.splice(i, 1);
+            });
+        }
+
+        function checkCollision() {
+            // P1 Lasers hitting P2
+            p1.lasers.forEach((l, i) => {
+                if (l.x > p2.x && l.x < p2.x + p2.w && l.y > p2.y && l.y < p2.y + p2.h) {
+                    p2.hp -= 10;
+                    p1.lasers.splice(i, 1);
+                }
+            });
+
+            // P2 Lasers hitting P1
+            p2.lasers.forEach((l, i) => {
+                if (l.x > p1.x && l.x < p1.x + p1.w && l.y > p1.y && l.y < p1.y + p1.h) {
+                    p1.hp -= 10;
+                    p2.lasers.splice(i, 1);
+                }
+            });
+
+            document.getElementById('p1-stats').innerText = `P1 HEALTH: ${p1.hp}`;
+            document.getElementById('p2-stats').innerText = `P2 HEALTH: ${p2.hp}`;
+
+            if (p1.hp <= 0 || p2.hp <= 0) {
+                gameRunning = false;
+                alert(p1.hp <= 0 ? "PLAYER 2 WINS!" : "PLAYER 1 WINS!");
+                location.reload();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawPlayer(p1, 0);
+            drawPlayer(p2, Math.PI);
+
+            // Draw Lasers
+            p1.lasers.forEach(l => {
+                ctx.fillStyle = p1.color;
+                ctx.fillRect(l.x, l.y, 10, 2);
+            });
+            p2.lasers.forEach(l => {
+                ctx.fillStyle = p2.color;
+                ctx.fillRect(l.x, l.y, -10, 2);
+            });
+        }
+
+        function loop() {
+            if (!gameRunning) return;
+            updatePlayer(p1, 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space', 1);
+            updatePlayer(p2, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', -1);
+            checkCollision();
+            draw();
+            requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>
