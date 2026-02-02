@@ -1,107 +1,137 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Hunt: 2-Player P2P</title>
+    <title>PIXEL KILL</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #050505; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
-        canvas { display: block; image-rendering: pixelated; }
-        .menu { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #0f0; }
-        input { font-size: 2rem; width: 160px; text-align: center; background: #111; color: #0f0; border: 2px solid #0f0; padding: 10px; margin: 15px; outline: none; }
-        .btn { padding: 15px 40px; font-size: 1.2rem; cursor: pointer; background: #0f0; color: #000; border: none; font-weight: bold; }
-        #stats { position: fixed; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; pointer-events: none; z-index: 10; font-weight: bold; text-shadow: 2px 2px #000; }
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; width: 100vw; height: 100vh; 
+            background: #000; overflow: hidden; touch-action: none; 
+            font-family: 'Courier New', monospace; 
+        }
+        canvas { 
+            display: block; width: 100%; height: 100%; 
+            image-rendering: pixelated; 
+        }
+        .menu { 
+            position: fixed; inset: 0; background: #0a0a0a; 
+            z-index: 100; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; color: #ff0044; 
+        }
+        h1 { font-size: 3rem; margin: 0; text-shadow: 4px 4px #440011; letter-spacing: 5px; }
+        input { 
+            font-size: 2rem; width: 180px; text-align: center; 
+            background: #1a1a1a; color: #fff; border: 3px solid #ff0044; 
+            padding: 10px; margin: 20px; outline: none; border-radius: 8px;
+        }
+        .btn { 
+            padding: 15px 40px; font-size: 1.2rem; cursor: pointer; 
+            background: #ff0044; color: #fff; border: none; 
+            font-weight: bold; border-radius: 5px; margin: 5px;
+        }
+        #stats { 
+            position: fixed; top: 15px; width: 100%; 
+            display: none; justify-content: space-around; 
+            color: #fff; pointer-events: none; z-index: 10; 
+            font-size: 1.2rem; text-shadow: 2px 2px #000;
+        }
     </style>
 </head>
 <body>
 
     <div id="menu" class="menu">
-        <h1>CYBER-HUNT P2P</h1>
-        <input type="number" id="room-code" placeholder="777">
+        <h1>PIXEL KILL</h1>
+        <p style="color: #666;">ONE KILLER. ONE SURVIVOR.</p>
+        <input type="number" id="room-code" placeholder="000" pattern="\d*">
         <div>
-            <button class="btn" onclick="init(true)">HOST</button>
-            <button class="btn" style="background:#00f2ff" onclick="init(false)">JOIN</button>
+            <button class="btn" onclick="initGame(true)">HOST</button>
+            <button class="btn" style="background:#444" onclick="initGame(false)">JOIN</button>
         </div>
-        <p id="status">Enter 3-digit code & pick Host or Join</p>
+        <p id="status" style="margin-top:20px; color:#ff0044;">Enter 3-digit code</p>
     </div>
 
-    <div id="stats" style="display:none">
-        <div id="p1-info">HP: [][][]</div>
-        <div id="timer">PIXEL HUNT</div>
-        <div id="p2-info">HP: [][][]</div>
+    <div id="stats">
+        <div id="hp-display">SURVIVOR HP: [][][]</div>
+        <div id="role-display">HUNTING...</div>
     </div>
 
-    <canvas id="game"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('game');
+        const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let peer, conn, isHost;
         
-        // Game State
-        const world = { width: 800, height: 1200 }; // Virtual coordinates
+        // Dynamic World Scaling
+        let world = { w: 1000, h: 1500 }; 
         const obstacles = [
-            {x: 200, y: 300, w: 400, h: 40},
-            {x: 100, y: 600, w: 40, h: 300},
-            {x: 660, y: 600, w: 40, h: 300}
+            {x: 250, y: 400, w: 500, h: 50},
+            {x: 150, y: 800, w: 50, h: 400},
+            {x: 800, y: 800, w: 50, h: 400}
         ];
 
-        let p1 = { x: 100, y: 100, hp: 3, role: 'survivor', color: '#0f0', vx: 0, vy: 0 };
-        let p2 = { x: 700, y: 1100, hp: 3, role: 'killer', color: '#f00', vx: 0, vy: 0 };
+        let p1 = { x: 200, y: 200, hp: 3, role: 'survivor', color: '#00ff66', vx: 0, vy: 0 }; // Survivor
+        let p2 = { x: 800, y: 1300, hp: 1, role: 'killer', color: '#ff0044', vx: 0, vy: 0 };  // Killer
         
-        // Touch Joystick Logic
-        let touchData = { active: false, startX: 0, startY: 0 };
+        let touchOrigin = null;
 
-        function init(hostMode) {
+        function initGame(hostMode) {
             isHost = hostMode;
             const code = document.getElementById('room-code').value;
-            if(!code) return alert("Enter a code!");
-            
-            document.getElementById('status').innerText = "Connecting...";
-            peer = new Peer("PIXEL-VAL-" + code);
+            if(!code || code.length < 1) return alert("Enter code!");
+
+            const roomId = "PK-" + code;
+            document.getElementById('status').innerText = "CONNECTING...";
+
+            peer = new Peer(hostMode ? roomId : null);
 
             peer.on('open', (id) => {
-                if(isHost) {
-                    document.getElementById('status').innerText = "Waiting for Player 2...";
+                if(hostMode) {
+                    document.getElementById('status').innerText = "WAITING FOR PLAYER 2...";
                 } else {
-                    conn = peer.connect("PIXEL-VAL-" + code);
-                    setupConn();
+                    conn = peer.connect(roomId);
+                    setupConnection();
                 }
             });
 
-            peer.on('connection', (c) => { conn = c; setupConn(); });
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
+            });
+
+            peer.on('error', () => {
+                alert("Room not found. Make sure Host has started first!");
+                location.reload();
+            });
         }
 
-        function setupConn() {
+        function setupConnection() {
             conn.on('open', () => {
                 document.getElementById('menu').style.display = 'none';
                 document.getElementById('stats').style.display = 'flex';
-                requestAnimationFrame(loop);
+                document.getElementById('role-display').innerText = isHost ? "YOU ARE SURVIVOR" : "YOU ARE KILLER";
+                requestAnimationFrame(mainLoop);
             });
             conn.on('data', (data) => {
                 if(isHost) p2 = data; else p1 = data;
-                updateHPUI();
             });
         }
 
-        function updateHPUI() {
-            document.getElementById('p1-info').innerText = `G: ${"❤️".repeat(p1.hp)}`;
-            document.getElementById('p2-info').innerText = `R: ${p2.role === 'killer' ? '🔪' : '❤️'}`;
-        }
-
-        // Controls
+        // Joystick-style movement
         window.addEventListener('touchstart', e => {
-            touchData.active = true;
-            touchData.startX = e.touches[0].clientX;
-            touchData.startY = e.touches[0].clientY;
+            touchOrigin = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         });
 
         window.addEventListener('touchmove', e => {
-            if(!touchData.active) return;
-            const dx = e.touches[0].clientX - touchData.startX;
-            const dy = e.touches[0].clientY - touchData.startY;
+            if(!touchOrigin) return;
+            const dx = e.touches[0].clientX - touchOrigin.x;
+            const dy = e.touches[0].clientY - touchOrigin.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
             const angle = Math.atan2(dy, dx);
-            const speed = 7;
+            const speed = Math.min(dist / 10, 8); // Max speed cap
             
             const me = isHost ? p1 : p2;
             me.vx = Math.cos(angle) * speed;
@@ -111,74 +141,69 @@
         window.addEventListener('touchend', () => {
             const me = isHost ? p1 : p2;
             me.vx = 0; me.vy = 0;
-            touchData.active = false;
+            touchOrigin = null;
         });
 
-        function checkCollision(obj1, obj2) {
-            return obj1.x < obj2.x + 30 && obj1.x + 30 > obj2.x && obj1.y < obj2.y + 30 && obj1.y + 30 > obj2.y;
+        function checkWall(x, y) {
+            return obstacles.some(o => x < o.x + o.w && x + 40 > o.x && y < o.y + o.h && y + 40 > o.y);
         }
 
-        function loop() {
-            // Scale Canvas
+        function mainLoop() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            const scaleX = canvas.width / world.width;
-            const scaleY = canvas.height / world.height;
-
+            
             const me = isHost ? p1 : p2;
             
-            // Movement + Obstacle collision
-            let nextX = me.x + me.vx;
-            let nextY = me.y + me.vy;
-            let blocked = false;
-            
-            obstacles.forEach(ob => {
-                if(nextX < ob.x + ob.w && nextX + 30 > ob.x && nextY < ob.y + ob.h && nextY + 30 > ob.y) blocked = true;
-            });
+            // Movement logic
+            if(!checkWall(me.x + me.vx, me.y)) me.x += me.vx;
+            if(!checkWall(me.x, me.y + me.vy)) me.y += me.vy;
 
-            if(!blocked) {
-                me.x = Math.max(0, Math.min(world.width - 30, nextX));
-                me.y = Math.max(0, Math.min(world.height - 30, nextY));
-            }
+            // Boundaries
+            me.x = Math.max(0, Math.min(world.w - 40, me.x));
+            me.y = Math.max(0, Math.min(world.h - 40, me.y));
 
-            // Killer Logic (Only handled by Host to prevent lag bugs)
-            if(isHost && checkCollision(p1, p2)) {
-                p1.hp -= 0.05; // Damage over time while touching
-                if(p1.hp < 0) { p1.x = 100; p1.y = 100; p1.hp = 3; alert("Killer Caught You!"); }
+            // Damage logic (Host calculates for consistency)
+            if(isHost) {
+                const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+                if(dist < 50) p1.hp -= 0.01;
+                document.getElementById('hp-display').innerText = "SURVIVOR HP: " + "■".repeat(Math.ceil(p1.hp * 3) / 3);
+                if(p1.hp <= 0) { alert("KILLER WINS!"); location.reload(); }
             }
 
             if(conn && conn.open) conn.send(me);
 
-            // Draw
+            // Draw everything
             ctx.fillStyle = '#050505';
             ctx.fillRect(0,0,canvas.width, canvas.height);
 
+            const sX = canvas.width / world.w;
+            const sY = canvas.height / world.h;
             ctx.save();
-            ctx.scale(scaleX, scaleY);
+            ctx.scale(sX, sY);
 
             // Obstacles
-            ctx.fillStyle = '#333';
-            obstacles.forEach(ob => ctx.fillRect(ob.x, ob.y, ob.w, ob.h));
+            ctx.fillStyle = '#222';
+            obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
 
-            // Characters
-            drawPlayer(p1);
-            drawPlayer(p2);
+            // Players
+            drawPixelPlayer(p1.x, p1.y, p1.color, false);
+            drawPixelPlayer(p2.x, p2.y, p2.color, true);
 
             ctx.restore();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(mainLoop);
         }
 
-        function drawPlayer(p) {
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 30, 30); // Body
-            ctx.fillStyle = 'white';
-            ctx.fillRect(p.x+5, p.y+5, 5, 5); ctx.fillRect(p.x+20, p.y+5, 5, 5); // Eyes
+        function drawPixelPlayer(x, y, color, isKiller) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 40, 40); // Body
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(x+8, y+8, 8, 8); ctx.fillRect(x+24, y+8, 8, 8); // Eyes
             
-            if(p.role === 'killer') {
-                ctx.fillStyle = '#eee';
-                ctx.fillRect(p.x + 30, p.y + 10, 15, 5); // Knife Blade
-                ctx.fillStyle = '#888';
-                ctx.fillRect(p.x + 30, p.y + 8, 2, 9); // Knife Handle
+            if(isKiller) {
+                ctx.fillStyle = '#fff'; // Knife Blade
+                ctx.fillRect(x - 20, y + 20, 20, 8);
+                ctx.fillStyle = '#444'; // Handle
+                ctx.fillRect(x - 5, y + 15, 5, 18);
             }
         }
     </script>
