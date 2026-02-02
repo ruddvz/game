@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rudra x Hitanshi: The 2026 Quest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Fredoka:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-pink: #ff007f;
+            --cyber-blue: #00f2ff;
+            --dark-space: #0a0a12;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background: var(--dark-space);
+            color: white;
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 100%);
+            z-index: 1;
+        }
+
+        .ui-layer {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100vh; padding: 20px;
+            text-align: center;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 40px; border-radius: 30px;
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
+            max-width: 500px; width: 100%;
+        }
+
+        h1 { font-family: 'Orbitron', sans-serif; color: var(--cyber-blue); margin-bottom: 20px; }
+        
+        .input-field {
+            background: rgba(0,0,0,0.5); border: 2px solid var(--cyber-blue);
+            padding: 15px; border-radius: 15px; color: white;
+            font-size: 1.2rem; width: 80%; margin-bottom: 20px; text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, var(--neon-pink), #ff4d00);
+            border: none; padding: 15px 40px; border-radius: 50px;
+            color: white; font-weight: bold; cursor: pointer;
+            font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px;
+            transition: 0.3s;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 20px var(--neon-pink); }
+
+        /* Game Elements */
+        #heart-mini-game { display: none; }
+        .heart-target {
+            font-size: 4rem; cursor: pointer; position: absolute;
+            filter: drop-shadow(0 0 10px var(--neon-pink));
+            transition: 0.1s;
+        }
+
+        #unlock-code-display {
+            font-size: 2rem; color: var(--neon-pink); letter-spacing: 5px;
+            margin: 20px 0; font-family: 'Orbitron', sans-serif;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* The Final Bridge */
+        .proposal-text { line-height: 1.6; font-size: 1.2rem; }
+        .wife-btn { font-size: 2rem; padding: 20px 60px; margin-top: 30px; }
+
+    </style>
+</head>
+<body>
+    <div id="game-canvas"></div>
+
+    <div class="ui-layer" id="start-screen">
+        <div class="glass-card">
+            <h1>LDR QUEST 2026</h1>
+            <p>Welcome, Player 1 (Rudra) or Player 2 (Hitanshi)?</p>
+            <br>
+            <button class="btn" onclick="startRudra()">I am RUDRA</button>
+            <br><br>
+            <button class="btn" style="background: var(--cyber-blue); color: black;" onclick="startHitanshi()">I am HITANSHI</button>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="rudra-challenge">
+        <div class="glass-card">
+            <h1>RUDRA'S PORTAL</h1>
+            <p>Click 10 floating hearts to generate the Access Key for Hitanshi!</p>
+            <h2 id="score-display">Hearts: 0/10</h2>
+        </div>
+        <div id="heart-area"></div>
+    </div>
+
+    <div class="ui-layer hidden" id="rudra-finish">
+        <div class="glass-card">
+            <h1>MISSION SUCCESS</h1>
+            <p>Send this code to Hitanshi so she can enter the bridge:</p>
+            <div id="unlock-code-display">HITANSHI2026</div>
+            <p>She needs this to unlock her half of the world!</p>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="hitanshi-login">
+        <div class="glass-card">
+            <h1>HITANSHI'S PORTAL</h1>
+            <p>Enter the Secret Access Key from Rudra:</p>
+            <input type="text" id="access-key" class="input-field" placeholder="K E Y">
+            <button class="btn" onclick="verifyKey()">UNLOCK BRIDGE</button>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="finale">
+        <div class="glass-card" style="max-width: 700px;">
+            <h1 id="finale-title">BRIDGE CONNECTED! 💕</h1>
+            <div class="proposal-text">
+                <p>My Love, Hitanshi...</p>
+                <p>We are currently miles apart, but in this digital world and the real one, I am always by your side.</p>
+                <p><strong>I know this is not a special thing to do, but I wanted to do this for you.</strong></p>
+                <p style="font-size: 1.5rem; color: var(--neon-pink); margin: 20px 0;">
+                    Will you be my Valentine today, and will you be my future wife tomorrow?
+                </p>
+            </div>
+            <button class="btn wife-btn" onclick="celebrate()">YES, FOREVER! 💍</button>
+            <button class="btn" id="no-btn" style="background: #333; margin-left: 10px;">No</button>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        const noBtn = document.getElementById('no-btn');
+
+        // Initial Background Stars
+        function createStars() {
+            const canvas = document.getElementById('game-canvas');
+            for(let i=0; i<100; i++) {
+                let star = document.createElement('div');
+                star.style.position = 'absolute';
+                star.style.width = '2px';
+                star.style.height = '2px';
+                star.style.background = 'white';
+                star.style.left = Math.random() * 100 + 'vw';
+                star.style.top = Math.random() * 100 + 'vh';
+                star.style.opacity = Math.random();
+                canvas.appendChild(star);
+            }
+        }
+        createStars();
+
+        // Navigation
+        function startRudra() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('rudra-challenge').classList.remove('hidden');
+            spawnHeart();
+        }
+
+        function startHitanshi() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('hitanshi-login').classList.remove('hidden');
+        }
+
+        // Rudra's Heart Game
+        function spawnHeart() {
+            if(score >= 10) {
+                document.getElementById('rudra-challenge').classList.add('hidden');
+                document.getElementById('rudra-finish').classList.remove('hidden');
+                return;
+            }
+            const heart = document.createElement('div');
+            heart.className = 'heart-target';
+            heart.innerHTML = '❤️';
+            heart.style.left = Math.random() * 80 + 10 + 'vw';
+            heart.style.top = Math.random() * 80 + 10 + 'vh';
+            heart.onclick = () => {
+                score++;
+                document.getElementById('score-display').innerText = `Hearts: ${score}/10`;
+                heart.remove();
+                spawnHeart();
+            };
+            document.body.appendChild(heart);
+        }
+
+        // Hitanshi's Key Verification
+        function verifyKey() {
+            const val = document.getElementById('access-key').value.toUpperCase();
+            if(val === 'HITANSHI2026') {
+                document.getElementById('hitanshi-login').classList.add('hidden');
+                document.getElementById('finale').classList.remove('hidden');
+            } else {
+                alert("Incorrect Key! Ask Rudra for the secret code.");
+            }
+        }
+
+        // The No Button (Moves away)
+        noBtn.addEventListener('mouseover', () => {
+            const x = Math.random() * (window.innerWidth - 100);
+            const y = Math.random() * (window.innerHeight - 50);
+            noBtn.style.position = 'fixed';
+            noBtn.style.left = x + 'px';
+            noBtn.style.top = y + 'px';
+            noBtn.innerText = "Please? 🥺";
+        });
+
+        // Final Celebration
+        function celebrate() {
+            document.getElementById('finale-title').innerText = "MRS. RUDRA SOON! 💍✨";
+            for(let i=0; i<100; i++) {
+                setTimeout(() => {
+                    const c = document.createElement('div');
+                    c.innerHTML = '💍';
+                    c.style.position = 'fixed';
+                    c.style.left = Math.random() * 100 + 'vw';
+                    c.style.top = '-50px';
+                    c.style.fontSize = '2rem';
+                    document.body.appendChild(c);
+                    c.animate([{ top: '-50px' }, { top: '100vh' }], { duration: Math.random() * 3000 + 2000 });
+                }, i * 50);
+            }
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rudra x Hitanshi: The 2026 Quest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Fredoka:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-pink: #ff007f;
+            --cyber-blue: #00f2ff;
+            --dark-space: #0a0a12;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background: var(--dark-space);
+            color: white;
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 100%);
+            z-index: 1;
+        }
+
+        .ui-layer {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100vh; padding: 20px;
+            text-align: center;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 40px; border-radius: 30px;
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
+            max-width: 500px; width: 100%;
+        }
+
+        h1 { font-family: 'Orbitron', sans-serif; color: var(--cyber-blue); margin-bottom: 20px; }
+        
+        .input-field {
+            background: rgba(0,0,0,0.5); border: 2px solid var(--cyber-blue);
+            padding: 15px; border-radius: 15px; color: white;
+            font-size: 1.2rem; width: 80%; margin-bottom: 20px; text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, var(--neon-pink), #ff4d00);
+            border: none; padding: 15px 40px; border-radius: 50px;
+            color: white; font-weight: bold; cursor: pointer;
+            font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px;
+            transition: 0.3s;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 20px var(--neon-pink); }
+
+        /* Game Elements */
+        #heart-mini-game { display: none; }
+        .heart-target {
+            font-size: 4rem; cursor: pointer; position: absolute;
+            filter: drop-shadow(0 0 10px var(--neon-pink));
+            transition: 0.1s;
+        }
+
+        #unlock-code-display {
+            font-size: 2rem; color: var(--neon-pink); letter-spacing: 5px;
+            margin: 20px 0; font-family: 'Orbitron', sans-serif;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* The Final Bridge */
+        .proposal-text { line-height: 1.6; font-size: 1.2rem; }
+        .wife-btn { font-size: 2rem; padding: 20px 60px; margin-top: 30px; }
+
+    </style>
+</head>
+<body>
+    <div id="game-canvas"></div>
+
+    <div class="ui-layer" id="start-screen">
+        <div class="glass-card">
+            <h1>LDR QUEST 2026</h1>
+            <p>Welcome, Player 1 (Rudra) or Player 2 (Hitanshi)?</p>
+            <br>
+            <button class="btn" onclick="startRudra()">I am RUDRA</button>
+            <br><br>
+            <button class="btn" style="background: var(--cyber-blue); color: black;" onclick="startHitanshi()">I am HITANSHI</button>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="rudra-challenge">
+        <div class="glass-card">
+            <h1>RUDRA'S PORTAL</h1>
+            <p>Click 10 floating hearts to generate the Access Key for Hitanshi!</p>
+            <h2 id="score-display">Hearts: 0/10</h2>
+        </div>
+        <div id="heart-area"></div>
+    </div>
+
+    <div class="ui-layer hidden" id="rudra-finish">
+        <div class="glass-card">
+            <h1>MISSION SUCCESS</h1>
+            <p>Send this code to Hitanshi so she can enter the bridge:</p>
+            <div id="unlock-code-display">HITANSHI2026</div>
+            <p>She needs this to unlock her half of the world!</p>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="hitanshi-login">
+        <div class="glass-card">
+            <h1>HITANSHI'S PORTAL</h1>
+            <p>Enter the Secret Access Key from Rudra:</p>
+            <input type="text" id="access-key" class="input-field" placeholder="K E Y">
+            <button class="btn" onclick="verifyKey()">UNLOCK BRIDGE</button>
+        </div>
+    </div>
+
+    <div class="ui-layer hidden" id="finale">
+        <div class="glass-card" style="max-width: 700px;">
+            <h1 id="finale-title">BRIDGE CONNECTED! 💕</h1>
+            <div class="proposal-text">
+                <p>My Love, Hitanshi...</p>
+                <p>We are currently miles apart, but in this digital world and the real one, I am always by your side.</p>
+                <p><strong>I know this is not a special thing to do, but I wanted to do this for you.</strong></p>
+                <p style="font-size: 1.5rem; color: var(--neon-pink); margin: 20px 0;">
+                    Will you be my Valentine today, and will you be my future wife tomorrow?
+                </p>
+            </div>
+            <button class="btn wife-btn" onclick="celebrate()">YES, FOREVER! 💍</button>
+            <button class="btn" id="no-btn" style="background: #333; margin-left: 10px;">No</button>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        const noBtn = document.getElementById('no-btn');
+
+        // Initial Background Stars
+        function createStars() {
+            const canvas = document.getElementById('game-canvas');
+            for(let i=0; i<100; i++) {
+                let star = document.createElement('div');
+                star.style.position = 'absolute';
+                star.style.width = '2px';
+                star.style.height = '2px';
+                star.style.background = 'white';
+                star.style.left = Math.random() * 100 + 'vw';
+                star.style.top = Math.random() * 100 + 'vh';
+                star.style.opacity = Math.random();
+                canvas.appendChild(star);
+            }
+        }
+        createStars();
+
+        // Navigation
+        function startRudra() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('rudra-challenge').classList.remove('hidden');
+            spawnHeart();
+        }
+
+        function startHitanshi() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('hitanshi-login').classList.remove('hidden');
+        }
+
+        // Rudra's Heart Game
+        function spawnHeart() {
+            if(score >= 10) {
+                document.getElementById('rudra-challenge').classList.add('hidden');
+                document.getElementById('rudra-finish').classList.remove('hidden');
+                return;
+            }
+            const heart = document.createElement('div');
+            heart.className = 'heart-target';
+            heart.innerHTML = '❤️';
+            heart.style.left = Math.random() * 80 + 10 + 'vw';
+            heart.style.top = Math.random() * 80 + 10 + 'vh';
+            heart.onclick = () => {
+                score++;
+                document.getElementById('score-display').innerText = `Hearts: ${score}/10`;
+                heart.remove();
+                spawnHeart();
+            };
+            document.body.appendChild(heart);
+        }
+
+        // Hitanshi's Key Verification
+        function verifyKey() {
+            const val = document.getElementById('access-key').value.toUpperCase();
+            if(val === 'HITANSHI2026') {
+                document.getElementById('hitanshi-login').classList.add('hidden');
+                document.getElementById('finale').classList.remove('hidden');
+            } else {
+                alert("Incorrect Key! Ask Rudra for the secret code.");
+            }
+        }
+
+        // The No Button (Moves away)
+        noBtn.addEventListener('mouseover', () => {
+            const x = Math.random() * (window.innerWidth - 100);
+            const y = Math.random() * (window.innerHeight - 50);
+            noBtn.style.position = 'fixed';
+            noBtn.style.left = x + 'px';
+            noBtn.style.top = y + 'px';
+            noBtn.innerText = "Please? 🥺";
+        });
+
+        // Final Celebration
+        function celebrate() {
+            document.getElementById('finale-title').innerText = "MRS. RUDRA SOON! 💍✨";
+            for(let i=0; i<100; i++) {
+                setTimeout(() => {
+                    const c = document.createElement('div');
+                    c.innerHTML = '💍';
+                    c.style.position = 'fixed';
+                    c.style.left = Math.random() * 100 + 'vw';
+                    c.style.top = '-50px';
+                    c.style.fontSize = '2rem';
+                    document.body.appendChild(c);
+                    c.animate([{ top: '-50px' }, { top: '100vh' }], { duration: Math.random() * 3000 + 2000 });
+                }, i * 50);
+            }
+        }
+    </script>
+</body>
+</html>
