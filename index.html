@@ -2,164 +2,224 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PIXEL KILL: HD PRO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PIXEL KILL HD</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #050508; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
-        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Courier New', monospace; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+
+        /* Mobile Connection Menu */
+        .overlay { position: fixed; inset: 0; background: #080808; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .logo { color: #fff; font-size: 2.5rem; margin-bottom: 5px; font-weight: 900; }
+        .logo span { color: #ff0044; }
+        input { font-size: 1.8rem; width: 100%; max-width: 250px; text-align: center; background: #111; color: #fff; border: 2px solid #333; padding: 15px; margin: 20px; border-radius: 10px; }
+        input:focus { border-color: #ff0044; }
+        .btn-row { display: flex; gap: 15px; width: 100%; max-width: 300px; }
+        .btn { flex: 1; padding: 20px; font-size: 1rem; cursor: pointer; border: none; font-weight: bold; border-radius: 10px; text-transform: uppercase; color: #fff; }
+        .btn-host { background: #ff0044; }
+        .btn-join { background: #00f2ff; color: #000; }
+        #log { font-size: 0.8rem; color: #666; margin-top: 20px; text-align: center; }
+
+        /* In-Game Mobile UI */
+        #hud { position: fixed; top: 20px; left: 20px; right: 20px; display: none; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .hp-bar { width: 120px; height: 12px; background: #222; border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
+        #hp-fill { width: 100%; height: 100%; background: #ff0044; transition: width 0.3s; }
         
-        /* Menu Overlay */
-        .menu { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ff0044; }
-        .hud { position: fixed; top: 0; width: 100%; padding: 20px; display: none; justify-content: space-between; z-index: 10; pointer-events: none; }
-        .hp-cont { width: 150px; height: 15px; background: #222; border: 2px solid #ff0044; border-radius: 10px; overflow: hidden; }
-        .hp-fill { height: 100%; background: #ff0044; transition: width 0.2s; box-shadow: 0 0 10px #ff0044; }
-        
-        /* Controls */
+        /* Touch Joystick & Buttons */
         .controls { position: fixed; bottom: 40px; right: 40px; display: none; z-index: 10; }
-        .dash-btn { width: 80px; height: 80px; background: rgba(255,0,68,0.2); border: 3px solid #ff0044; border-radius: 50%; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
-        
-        input { font-size: 1.5rem; width: 220px; text-align: center; background: #111; color: #fff; border: 2px solid #ff0044; padding: 10px; margin: 20px; border-radius: 5px; }
-        .start-btn { padding: 15px 35px; font-size: 1rem; cursor: pointer; background: #ff0044; color: #fff; border: none; font-weight: bold; text-transform: uppercase; }
+        .dash-circle { width: 85px; height: 85px; background: rgba(255, 255, 255, 0.1); border: 3px solid #fff; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; backdrop-filter: blur(5px); }
     </style>
 </head>
 <body>
 
-    <div id="menu" class="menu">
-        <h1 style="color:#fff; font-size: 3rem;">PIXEL<span style="color:#ff0044;">KILL</span></h1>
-        <input type="number" id="room-code" placeholder="ROOM CODE">
-        <div style="display:flex; gap:10px;">
-            <button class="start-btn" onclick="initGame(true)">HOST</button>
-            <button class="start-btn" style="background:#00f2ff" onclick="initGame(false)">JOIN</button>
+    <div id="menu" class="overlay">
+        <div class="logo">PIXEL<span>KILL</span></div>
+        <input type="number" id="room-code" placeholder="3-DIGIT CODE" inputmode="numeric">
+        <div class="btn-row">
+            <button class="btn btn-host" onclick="startApp(true)">HOST</button>
+            <button class="btn btn-join" onclick="startApp(false)">JOIN</button>
         </div>
+        <div id="log">Ready to hunt.</div>
     </div>
 
-    <div class="hud" id="hud">
-        <div><div style="color:#fff; font-size: 0.8rem; margin-bottom:5px;">SURVIVOR STATUS</div><div class="hp-cont"><div id="hp-fill" class="hp-fill"></div></div></div>
-        <div id="status-msg" style="color:#ff0044; font-weight:bold; text-align:right;">SYNCING...</div>
+    <div id="hud">
+        <div style="color:white">SURVIVOR<div class="hp-bar"><div id="hp-fill"></div></div></div>
+        <div id="status" style="color:#ff0044; font-weight:bold;">SEARCHING...</div>
     </div>
 
-    <div class="controls" id="controls">
-        <div class="dash-btn" id="dash-trigger">DASH</div>
+    <div class="controls" id="touch-controls">
+        <div class="dash-circle" id="dash-btn">DASH</div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="game"></canvas>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        let peer, conn, isHost, touchStart = null;
-        let shake = 0, blood = [], frame = 0;
+        const log = document.getElementById('log');
+        let peer, conn, isHost, frame = 0;
+        
+        // Physics & Game Data
+        const world = { w: 800, h: 1400 };
+        const safeZone = { x: 250, y: 50, w: 300, h: 180 };
+        let p1 = { x: 400, y: 150, hp: 100, color: '#00f2ff', vx:0, vy:0, rot:0, bob:0, dash:0 };
+        let p2 = { x: 400, y: 1200, color: '#ff0044', vx:0, vy:0, rot:0, bob:0, dash:0 };
+        let blood = [], shake = 0, touchPoint = null;
 
-        const world = { w: 1000, h: 1600 };
-        const safeZone = { x: 350, y: 50, w: 300, h: 200 };
-        const obstacles = [
-            {x: 100, y: 400, w: 250, h: 40}, {x: 650, y: 400, w: 250, h: 40},
-            {x: 480, y: 700, w: 40, h: 400}, {x: 0, y: 1200, w: 400, h: 40}, {x: 600, y: 1200, w: 400, h: 40}
-        ];
-
-        let p1 = { x: 500, y: 150, hp: 100, color: '#00f2ff', vx:0, vy:0, rot:0, bob:0, dash:0 };
-        let p2 = { x: 500, y: 1400, color: '#ff0044', vx:0, vy:0, rot:0, bob:0, dash:0 };
-
-        function initGame(host) {
+        function startApp(host) {
             isHost = host;
             const code = document.getElementById('room-code').value;
-            if(!code) return alert("Enter Code");
-            peer = new Peer("PK-ULTRA-" + code);
-            peer.on('open', () => {
-                if(host) document.getElementById('menu').innerHTML = "<h1>ROOM: "+code+"</h1><p>WAITING FOR KILLER...</p>";
-                else { conn = peer.connect("PK-ULTRA-" + code); setup(); }
+            if(!code) { log.innerText = "Error: Enter a code first!"; return; }
+            
+            const fullID = "PK-MOBILE-" + code;
+            log.innerText = host ? "Setting up Room..." : "Looking for Host...";
+            
+            peer = new Peer(host ? fullID : null, { debug: 1 });
+
+            peer.on('open', (id) => {
+                if(host) {
+                    log.innerText = "Host Ready! ID: " + code + "\nWaiting for partner...";
+                } else {
+                    log.innerText = "Connecting to " + code + "...";
+                    tryConnect(fullID);
+                }
             });
-            peer.on('connection', (c) => { conn = c; setup(); });
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupData();
+            });
+
+            peer.on('error', (err) => {
+                log.innerText = "Connection Error: " + err.type;
+                if(!host) setTimeout(() => startApp(false), 2000);
+            });
         }
 
-        function setup() {
+        function tryConnect(id) {
+            conn = peer.connect(id);
+            const timeout = setTimeout(() => {
+                if(!conn.open) { log.innerText = "Retrying connection..."; tryConnect(id); }
+            }, 3000);
+            setupData();
+        }
+
+        function setupData() {
             conn.on('open', () => {
                 document.getElementById('menu').style.display = 'none';
                 document.getElementById('hud').style.display = 'flex';
-                document.getElementById('controls').style.display = 'block';
-                document.getElementById('dash-trigger').ontouchstart = () => { (isHost ? p1 : p2).dash = 15; };
-                loop();
+                document.getElementById('touch-controls').style.display = 'block';
+                document.getElementById('dash-btn').ontouchstart = (e) => { 
+                    e.preventDefault(); 
+                    (isHost ? p1 : p2).dash = 20; 
+                };
+                requestAnimationFrame(gameLoop);
             });
-            conn.on('data', d => { if(isHost) p2 = d; else { p1 = d.p1; blood = d.blood; shake = d.shake; }});
+            conn.on('data', d => {
+                if(isHost) p2 = d;
+                else { p1 = d.p1; blood = d.blood; shake = d.shake; }
+            });
         }
 
-        window.addEventListener('touchstart', e => { if(e.target.id !== 'dash-trigger') touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
+        // Mobile Movement Logic
+        window.addEventListener('touchstart', e => {
+            if(e.target.id === 'dash-btn') return;
+            touchPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: false });
+
         window.addEventListener('touchmove', e => {
-            if(!touchStart) return;
-            const dx = e.touches[0].clientX - touchStart.x, dy = e.touches[0].clientY - touchStart.y;
-            const angle = Math.atan2(dy, dx), me = isHost ? p1 : p2;
+            if(!touchPoint) return;
+            const dx = e.touches[0].clientX - touchPoint.x;
+            const dy = e.touches[0].clientY - touchPoint.y;
+            const angle = Math.atan2(dy, dx);
+            const me = isHost ? p1 : p2;
             const speed = (me.dash > 0 ? 18 : 8);
-            me.vx = Math.cos(angle) * speed; me.vy = Math.sin(angle) * speed;
-            me.rot = angle + Math.PI/2; me.bob += 0.2;
+            
+            me.vx = Math.cos(angle) * speed;
+            me.vy = Math.sin(angle) * speed;
+            me.rot = angle + Math.PI/2;
+            me.bob += 0.2;
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            const me = isHost ? p1 : p2;
+            me.vx = 0; me.vy = 0;
+            touchPoint = null;
         });
-        window.addEventListener('touchend', () => { const me = isHost ? p1 : p2; me.vx = 0; me.vy = 0; touchStart = null; });
 
         function drawPlayer(p, isKiller) {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rot);
-            const b = Math.sin(p.bob) * 5;
+            const b = Math.sin(p.bob) * 4;
             
-            // Neon Glow
-            ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+            // HD Physics character look
+            ctx.shadowBlur = 10; ctx.shadowColor = p.color;
             ctx.fillStyle = p.color;
-            ctx.fillRect(-18, -18 + b, 36, 40); // Body
+            ctx.fillRect(-18, -20 + b, 36, 42); // Body
             
-            // Helmet Visor
-            ctx.fillStyle = '#000'; ctx.fillRect(-15, -10+b, 30, 10);
-            ctx.fillStyle = '#fff'; ctx.fillRect(-12, -8+b, 5, 2); 
+            ctx.fillStyle = "#000"; ctx.fillRect(-14, -10 + b, 28, 8); // Visor
+            ctx.fillStyle = "#fff"; ctx.fillRect(-10, -8 + b, 4, 2); // Glow
 
             if(isKiller) {
-                ctx.fillStyle = '#fff'; ctx.fillRect(18, -15+b, 8, 35); // Blade
-                ctx.fillStyle = '#444'; ctx.fillRect(16, 20+b, 12, 5); // Guard
+                ctx.fillStyle = "#fff"; ctx.fillRect(18, -10 + b, 6, 35); // Sharp Blade
+                ctx.fillStyle = "#ff0044"; ctx.fillRect(16, 25 + b, 10, 4); // Guard
             }
             ctx.restore();
         }
 
-        function loop() {
+        function gameLoop() {
             frame++;
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
             const me = isHost ? p1 : p2;
+            
             if(me.dash > 0) me.dash--;
 
-            // Collision Physics
-            const check = (nx, ny, char) => {
-                if(char === 'killer' && nx > safeZone.x && nx < safeZone.x+safeZone.w && ny > safeZone.y && ny < safeZone.y+safeZone.h) return false;
-                return !obstacles.some(o => nx < o.x + o.w && nx + 30 > o.x && ny < o.y + o.h && ny + 30 > o.y);
-            };
-
-            const role = isHost ? 'survivor' : 'killer';
-            if(check(me.x + me.vx, me.y, role)) me.x += me.vx;
-            if(check(me.x, me.y + me.vy, role)) me.y += me.vy;
-            me.x = Math.max(20, Math.min(world.w-20, me.x)); me.y = Math.max(20, Math.min(world.h-20, me.y));
+            // Simple movement
+            me.x = Math.max(20, Math.min(world.w-20, me.x + me.vx));
+            me.y = Math.max(20, Math.min(world.h-20, me.y + me.vy));
 
             if(isHost) {
                 const dist = Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
                 const inSafe = (p1.x > safeZone.x && p1.x < safeZone.x+safeZone.w && p1.y > safeZone.y && p1.y < safeZone.y+safeZone.h);
-                if(dist < 60 && !inSafe) {
-                    p1.hp -= 0.5; shake = 10;
-                    if(frame % 5 === 0) blood.push({x:p1.x, y:p1.y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, l:30});
+                
+                if(dist < 55 && !inSafe) {
+                    p1.hp -= 0.4; shake = 10;
+                    if(frame % 4 === 0) blood.push({x:p1.x, y:p1.y, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12, l:25});
                 }
+                
                 document.getElementById('hp-fill').style.width = p1.hp + "%";
-                if(p1.hp <= 0) { alert("KILLER WINS"); location.reload(); }
-                if(conn) conn.send({p1, blood, shake});
-            } else if(conn) conn.send(p2);
+                if(p1.hp <= 0) { alert("KILLER WINS!"); location.reload(); }
+                if(conn && conn.open) conn.send({p1, blood, shake});
+            } else {
+                if(conn && conn.open) conn.send(p2);
+            }
 
             if(shake > 0) { ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); shake *= 0.8; }
-            ctx.save(); ctx.scale(canvas.width/world.w, canvas.height/world.h);
             
-            // Safe Zone Drawing
-            ctx.fillStyle = 'rgba(0, 242, 255, 0.1)';
+            ctx.save();
+            ctx.scale(canvas.width/world.w, canvas.height/world.h);
+            
+            // Draw Safe Zone
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.05)';
             ctx.fillRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
-            ctx.strokeStyle = '#00f2ff'; ctx.strokeRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+            ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2; ctx.strokeRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
 
-            ctx.fillStyle = '#1a1a2a'; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
-            blood.forEach((b,i) => { ctx.fillStyle = `rgba(255,0,68,${b.l/30})`; ctx.fillRect(b.x, b.y, 5, 5); b.x+=b.vx; b.y+=b.vy; b.l--; if(b.l<=0) blood.splice(i,1); });
+            // Draw Blood
+            blood.forEach((b, i) => {
+                ctx.fillStyle = `rgba(255,0,68,${b.l/25})`;
+                ctx.fillRect(b.x, b.y, 6, 6); b.x+=b.vx; b.y+=b.vy; b.l--;
+                if(b.l<=0) blood.splice(i, 1);
+            });
 
-            drawPlayer(p1, false); drawPlayer(p2, true);
-            ctx.restore(); requestAnimationFrame(loop);
+            drawPlayer(p1, false);
+            drawPlayer(p2, true);
+            
+            ctx.restore();
+            requestAnimationFrame(gameLoop);
         }
     </script>
 </body>
