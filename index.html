@@ -3,223 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>PIXEL KILL HD</title>
+    <title>CYBER KILL HD</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Courier New', monospace; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
-        canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a12; overflow: hidden; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
 
-        /* Mobile Connection Menu */
-        .overlay { position: fixed; inset: 0; background: #080808; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .logo { color: #fff; font-size: 2.5rem; margin-bottom: 5px; font-weight: 900; }
-        .logo span { color: #ff0044; }
-        input { font-size: 1.8rem; width: 100%; max-width: 250px; text-align: center; background: #111; color: #fff; border: 2px solid #333; padding: 15px; margin: 20px; border-radius: 10px; }
-        input:focus { border-color: #ff0044; }
-        .btn-row { display: flex; gap: 15px; width: 100%; max-width: 300px; }
-        .btn { flex: 1; padding: 20px; font-size: 1rem; cursor: pointer; border: none; font-weight: bold; border-radius: 10px; text-transform: uppercase; color: #fff; }
-        .btn-host { background: #ff0044; }
-        .btn-join { background: #00f2ff; color: #000; }
-        #log { font-size: 0.8rem; color: #666; margin-top: 20px; text-align: center; }
+        /* Clean Menu */
+        .overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #050508 0%, #1a1a2e 100%); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .logo { color: #fff; font-size: 3rem; font-weight: 800; letter-spacing: -2px; margin-bottom: 20px; }
+        .logo span { color: #00f2ff; text-shadow: 0 0 20px #00f2ff; }
+        input { font-size: 1.5rem; width: 260px; text-align: center; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 15px; border-radius: 50px; margin-bottom: 20px; backdrop-filter: blur(10px); }
+        .btn-group { display: flex; gap: 10px; }
+        .btn { padding: 18px 35px; border-radius: 50px; border: none; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+        .btn-h { background: #ff0044; color: #fff; box-shadow: 0 10px 20px rgba(255,0,68,0.3); }
+        .btn-j { background: #00f2ff; color: #000; box-shadow: 0 10px 20px rgba(0,242,255,0.3); }
 
-        /* In-Game Mobile UI */
-        #hud { position: fixed; top: 20px; left: 20px; right: 20px; display: none; justify-content: space-between; pointer-events: none; z-index: 10; }
-        .hp-bar { width: 120px; height: 12px; background: #222; border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
-        #hp-fill { width: 100%; height: 100%; background: #ff0044; transition: width 0.3s; }
-        
-        /* Touch Joystick & Buttons */
-        .controls { position: fixed; bottom: 40px; right: 40px; display: none; z-index: 10; }
-        .dash-circle { width: 85px; height: 85px; background: rgba(255, 255, 255, 0.1); border: 3px solid #fff; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; backdrop-filter: blur(5px); }
+        /* Gameplay UI */
+        #ui { position: fixed; top: 40px; left: 0; width: 100%; display: none; justify-content: center; pointer-events: none; z-index: 10; }
+        .hp-container { width: 200px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; }
+        #hp-bar { width: 100%; height: 100%; background: #ff0044; transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
 <body>
 
     <div id="menu" class="overlay">
-        <div class="logo">PIXEL<span>KILL</span></div>
-        <input type="number" id="room-code" placeholder="3-DIGIT CODE" inputmode="numeric">
-        <div class="btn-row">
-            <button class="btn btn-host" onclick="startApp(true)">HOST</button>
-            <button class="btn btn-join" onclick="startApp(false)">JOIN</button>
+        <div class="logo">CYBER<span>KILL</span></div>
+        <input type="number" id="room-code" placeholder="ENTER CODE" inputmode="numeric">
+        <div class="btn-group">
+            <button class="btn btn-h" onclick="connect(true)">HOST</button>
+            <button class="btn btn-j" onclick="connect(false)">JOIN</button>
         </div>
-        <div id="log">Ready to hunt.</div>
     </div>
 
-    <div id="hud">
-        <div style="color:white">SURVIVOR<div class="hp-bar"><div id="hp-fill"></div></div></div>
-        <div id="status" style="color:#ff0044; font-weight:bold;">SEARCHING...</div>
+    <div id="ui">
+        <div class="hp-container"><div id="hp-bar"></div></div>
     </div>
 
-    <div class="controls" id="touch-controls">
-        <div class="dash-circle" id="dash-btn">DASH</div>
-    </div>
-
-    <canvas id="game"></canvas>
+    <canvas id="stage"></canvas>
 
     <script>
-        const canvas = document.getElementById('game');
+        const canvas = document.getElementById('stage');
         const ctx = canvas.getContext('2d');
-        const log = document.getElementById('log');
-        let peer, conn, isHost, frame = 0;
+        let peer, conn, isHost;
         
-        // Physics & Game Data
-        const world = { w: 800, h: 1400 };
-        const safeZone = { x: 250, y: 50, w: 300, h: 180 };
-        let p1 = { x: 400, y: 150, hp: 100, color: '#00f2ff', vx:0, vy:0, rot:0, bob:0, dash:0 };
-        let p2 = { x: 400, y: 1200, color: '#ff0044', vx:0, vy:0, rot:0, bob:0, dash:0 };
-        let blood = [], shake = 0, touchPoint = null;
+        const world = { w: 1000, h: 1800 };
+        const obstacles = [
+            {x: 200, y: 500, w: 600, r: 20}, // Neon Pillars
+            {x: 100, y: 1000, w: 150, r: 15},
+            {x: 750, y: 1000, w: 150, r: 15}
+        ];
 
-        function startApp(host) {
+        let p1 = { x: 500, y: 300, hp: 100, accX: 0, accY: 0, vx: 0, vy: 0, angle: 0, lean: 0, color: '#00f2ff' };
+        let p2 = { x: 500, y: 1500, accX: 0, accY: 0, vx: 0, vy: 0, angle: 0, lean: 0, color: '#ff0044' };
+        let blood = [], joy = null;
+
+        function connect(host) {
             isHost = host;
             const code = document.getElementById('room-code').value;
-            if(!code) { log.innerText = "Error: Enter a code first!"; return; }
-            
-            const fullID = "PK-MOBILE-" + code;
-            log.innerText = host ? "Setting up Room..." : "Looking for Host...";
-            
-            peer = new Peer(host ? fullID : null, { debug: 1 });
-
-            peer.on('open', (id) => {
-                if(host) {
-                    log.innerText = "Host Ready! ID: " + code + "\nWaiting for partner...";
-                } else {
-                    log.innerText = "Connecting to " + code + "...";
-                    tryConnect(fullID);
-                }
+            const id = "CK-HD-" + code;
+            peer = new Peer(host ? id : null);
+            peer.on('open', () => {
+                if(!host) { conn = peer.connect(id); setup(); }
+                else { document.querySelector('.logo').innerText = "WAITING..."; }
             });
-
-            peer.on('connection', (c) => {
-                conn = c;
-                setupData();
-            });
-
-            peer.on('error', (err) => {
-                log.innerText = "Connection Error: " + err.type;
-                if(!host) setTimeout(() => startApp(false), 2000);
-            });
+            peer.on('connection', (c) => { conn = c; setup(); });
         }
 
-        function tryConnect(id) {
-            conn = peer.connect(id);
-            const timeout = setTimeout(() => {
-                if(!conn.open) { log.innerText = "Retrying connection..."; tryConnect(id); }
-            }, 3000);
-            setupData();
-        }
-
-        function setupData() {
+        function setup() {
             conn.on('open', () => {
                 document.getElementById('menu').style.display = 'none';
-                document.getElementById('hud').style.display = 'flex';
-                document.getElementById('touch-controls').style.display = 'block';
-                document.getElementById('dash-btn').ontouchstart = (e) => { 
-                    e.preventDefault(); 
-                    (isHost ? p1 : p2).dash = 20; 
-                };
-                requestAnimationFrame(gameLoop);
+                document.getElementById('ui').style.display = 'flex';
+                requestAnimationFrame(run);
             });
-            conn.on('data', d => {
-                if(isHost) p2 = d;
-                else { p1 = d.p1; blood = d.blood; shake = d.shake; }
-            });
+            conn.on('data', d => { if(isHost) p2 = d; else { p1 = d.p1; blood = d.blood; }});
         }
 
-        // Mobile Movement Logic
-        window.addEventListener('touchstart', e => {
-            if(e.target.id === 'dash-btn') return;
-            touchPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }, { passive: false });
-
+        window.addEventListener('touchstart', e => { joy = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
         window.addEventListener('touchmove', e => {
-            if(!touchPoint) return;
-            const dx = e.touches[0].clientX - touchPoint.x;
-            const dy = e.touches[0].clientY - touchPoint.y;
-            const angle = Math.atan2(dy, dx);
+            if(!joy) return;
+            const dx = e.touches[0].clientX - joy.x, dy = e.touches[0].clientY - joy.y;
+            const dist = Math.sqrt(dx*dx+dy*dy), ang = Math.atan2(dy, dx);
             const me = isHost ? p1 : p2;
-            const speed = (me.dash > 0 ? 18 : 8);
-            
-            me.vx = Math.cos(angle) * speed;
-            me.vy = Math.sin(angle) * speed;
-            me.rot = angle + Math.PI/2;
-            me.bob += 0.2;
-        }, { passive: false });
-
-        window.addEventListener('touchend', () => {
-            const me = isHost ? p1 : p2;
-            me.vx = 0; me.vy = 0;
-            touchPoint = null;
+            const power = Math.min(dist/50, 1);
+            me.accX = Math.cos(ang) * power; me.accY = Math.sin(ang) * power;
+            me.angle = ang;
         });
+        window.addEventListener('touchend', () => { const me = isHost ? p1 : p2; me.accX = 0; me.accY = 0; joy = null; });
 
         function drawPlayer(p, isKiller) {
             ctx.save();
             ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot);
-            const b = Math.sin(p.bob) * 4;
+            ctx.rotate(p.angle);
             
-            // HD Physics character look
-            ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+            // Physics Lean
+            const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+            ctx.scale(1 + speed/50, 1 - speed/100);
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.arc(0, 0, 35, 0, Math.PI*2); ctx.fill();
+
+            // Body
+            ctx.shadowBlur = 20; ctx.shadowColor = p.color;
             ctx.fillStyle = p.color;
-            ctx.fillRect(-18, -20 + b, 36, 42); // Body
-            
-            ctx.fillStyle = "#000"; ctx.fillRect(-14, -10 + b, 28, 8); // Visor
-            ctx.fillStyle = "#fff"; ctx.fillRect(-10, -8 + b, 4, 2); // Glow
+            ctx.beginPath();
+            ctx.roundRect(-25, -25, 50, 50, 12);
+            ctx.fill();
+
+            // Detail
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.ellipse(15, -10, 8, 4, 0, 0, Math.PI*2); ctx.ellipse(15, 10, 8, 4, 0, 0, Math.PI*2); ctx.fill();
 
             if(isKiller) {
-                ctx.fillStyle = "#fff"; ctx.fillRect(18, -10 + b, 6, 35); // Sharp Blade
-                ctx.fillStyle = "#ff0044"; ctx.fillRect(16, 25 + b, 10, 4); // Guard
+                ctx.fillStyle = '#fff'; ctx.fillRect(25, -5, 40, 10); // Neon Blade
             }
             ctx.restore();
         }
 
-        function gameLoop() {
-            frame++;
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        function run() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
             const me = isHost ? p1 : p2;
-            
-            if(me.dash > 0) me.dash--;
 
-            // Simple movement
-            me.x = Math.max(20, Math.min(world.w-20, me.x + me.vx));
-            me.y = Math.max(20, Math.min(world.h-20, me.y + me.vy));
+            // Physics Logic: Acceleration -> Velocity -> Friction
+            me.vx += me.accX * 1.5; me.vy += me.accY * 1.5;
+            me.vx *= 0.92; me.vy *= 0.92; // Friction
+            me.x += me.vx; me.y += me.vy;
+
+            // Simple Collision
+            obstacles.forEach(o => {
+                const d = Math.sqrt((me.x-o.x)**2 + (me.y-o.y)**2);
+                if(d < o.w/2 + 30) { me.x -= me.vx*1.5; me.y -= me.vy*1.5; me.vx *= -0.5; me.vy *= -0.5; }
+            });
 
             if(isHost) {
                 const dist = Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
-                const inSafe = (p1.x > safeZone.x && p1.x < safeZone.x+safeZone.w && p1.y > safeZone.y && p1.y < safeZone.y+safeZone.h);
-                
-                if(dist < 55 && !inSafe) {
-                    p1.hp -= 0.4; shake = 10;
-                    if(frame % 4 === 0) blood.push({x:p1.x, y:p1.y, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12, l:25});
+                if(dist < 70) {
+                    p1.hp -= 0.5;
+                    if(Math.random() > 0.8) blood.push({x: p1.x, y: p1.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, l: 30});
                 }
-                
-                document.getElementById('hp-fill').style.width = p1.hp + "%";
-                if(p1.hp <= 0) { alert("KILLER WINS!"); location.reload(); }
-                if(conn && conn.open) conn.send({p1, blood, shake});
-            } else {
-                if(conn && conn.open) conn.send(p2);
-            }
+                document.getElementById('hp-bar').style.width = p1.hp + "%";
+                if(conn) conn.send({p1, blood});
+            } else if(conn) conn.send(p2);
 
-            if(shake > 0) { ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); shake *= 0.8; }
+            // Draw Background
+            const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.height);
+            grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(1, '#050508');
+            ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width, canvas.height);
             
-            ctx.save();
-            ctx.scale(canvas.width/world.w, canvas.height/world.h);
+            ctx.save(); ctx.scale(canvas.width/world.w, canvas.height/world.h);
             
-            // Draw Safe Zone
-            ctx.fillStyle = 'rgba(0, 242, 255, 0.05)';
-            ctx.fillRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
-            ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2; ctx.strokeRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+            // Floor Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            for(let i=0; i<world.w; i+=100) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,world.h); ctx.stroke(); }
 
-            // Draw Blood
-            blood.forEach((b, i) => {
-                ctx.fillStyle = `rgba(255,0,68,${b.l/25})`;
-                ctx.fillRect(b.x, b.y, 6, 6); b.x+=b.vx; b.y+=b.vy; b.l--;
-                if(b.l<=0) blood.splice(i, 1);
+            // Neon Obstacles
+            ctx.lineWidth = 4;
+            obstacles.forEach(o => {
+                ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.roundRect(o.x-o.w/2, o.y-10, o.w, 20, 10); ctx.stroke();
+                ctx.shadowBlur = 15; ctx.shadowColor = '#444'; ctx.fillStyle = '#111'; ctx.fill();
             });
 
-            drawPlayer(p1, false);
-            drawPlayer(p2, true);
-            
-            ctx.restore();
-            requestAnimationFrame(gameLoop);
+            blood.forEach((b, i) => {
+                ctx.fillStyle = `rgba(255,0,68,${b.l/30})`;
+                ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
+                b.x += b.vx; b.y += b.vy; b.l--;
+                if(b.l <= 0) blood.splice(i, 1);
+            });
+
+            drawPlayer(p1, false); drawPlayer(p2, true);
+            ctx.restore(); requestAnimationFrame(run);
         }
     </script>
 </body>
